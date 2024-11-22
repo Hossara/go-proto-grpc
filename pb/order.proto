@@ -71,8 +71,6 @@ message GetOrderResponse {
   repeated Order orders = 1;
 }
 
-message
-
 service OrderService {
   rpc GetOrder(GetOrderFilter) returns (GetOrderResponse);
 }
