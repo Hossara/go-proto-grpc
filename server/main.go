@@ -17,6 +17,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 
 	pb.RegisterOrderServiceServer(grpcServer, api.NewOrderGRPCServer())
+	pb.RegisterFSServer(grpcServer, api.NewFsGRPCApi("./files"))
 
 	log.Println("Starting gRPC Server on port 8080")
 	grpcServer.Serve(l)
