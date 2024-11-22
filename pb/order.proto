@@ -1,0 +1,62 @@
+syntax = "proto3";
+option go_package = "proto/pb";
+import "pb/user.proto";
+import "google/protobuf/any.proto";
+
+message OrderItem {
+  uint64 id = 1;
+  uint64 order_id = 2;
+  string item_name = 3;
+  uint32 quantity = 4;
+  uint32 unit_price = 5;
+  string item_description = 6;
+}
+
+message Order {
+  reserved 9;
+
+  uint64 id = 1;
+  uint32 quantity = 2;
+  uint32 total_bill = 3;
+  //string ipg_method = 4 [default = "saman", json_name = "ipg"];
+  string ipg_method = 4;
+  string voucher_code = 5;
+  string voucher_amount = 6;
+  repeated OrderItem items = 7;
+
+  /*
+  It's possible to be here
+
+  message OrderItem {
+    uint64 id = 1;
+    uint64 order_id = 2;
+    string item_name = 3;
+    uint32 quantity = 4;
+    uint32 unit_price = 5;
+    string item_description = 6;
+  }*/
+
+
+  enum OrderStatus {
+    reserved "FOLAN";
+
+    UNKNOWN = 0;
+    SETTLED = 1;
+    PAID = 3;
+     CANCELED = 4;
+    /*
+    Can't define reserved names.
+    FOLAN = 5;
+    */
+  }
+
+
+  //OrderStatus OBSOLETE_status = 8;
+  OrderStatus status = 8;
+  User user = 10;
+  repeated google.protobuf.Any details = 11;
+  oneof external_payment {
+    uint32 digi_pay = 12;
+    uint32 snapp_pay = 13;
+  };
+}
