@@ -59,4 +59,20 @@ message Order {
     uint32 digi_pay = 12;
     uint32 snapp_pay = 13;
   };
+  map<string, string> headers = 14;
+}
+
+message GetOrderFilter {
+  uint64 id = 1;
+  string username = 2;
+}
+
+message GetOrderResponse {
+  repeated Order orders = 1;
+}
+
+message
+
+service OrderService {
+  rpc GetOrder(GetOrderFilter) returns (GetOrderResponse);
 }
