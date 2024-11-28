@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"google.golang.org/grpc"
 	"log"
 	"os"
@@ -35,7 +36,7 @@ func (s *fsGRPCApi) Upload(req grpc.ClientStreamingServer[pb.Chunk, pb.UploadRes
 		}
 
 		if len(filename) == 0 {
-			filename = chunk.FileName
+			filename = chunk.GetFileName()
 
 		}
 
@@ -59,4 +60,43 @@ func (s *fsGRPCApi) Upload(req grpc.ClientStreamingServer[pb.Chunk, pb.UploadRes
 	})
 
 	return nil
+}
+
+func (s *fsGRPCApi) Download(req *pb.DownloadRequest, stream grpc.ServerStreamingServer[pb.Chunk]) error {
+	data, err := os.ReadFile(filepath.Join(s.fileDir, req.GetFileName()))
+
+	if err != nil {
+		return err
+	}
+
+	chunkSize := 500
+	start, end := 0, chunkSize
+	for {
+		if end >= len(data) {
+			end = len(data)
+		}
+
+		done := end == len(data)
+
+		dataToSend := data[start:end]
+
+		stream.Send(&pb.Chunk{
+			Data:     dataToSend,
+			FileName: req.GetFileName(),
+			Done:     done,
+		})
+
+		if done {
+			return nil
+		}
+
+		start, end = end, end+chunkSize
+
+	}
+}
+
+func (s *fsGRPCApi) Echo(ctx context.Context, req *pb.EchoMessage) (*pb.EchoResponse, error) {
+	return &pb.EchoResponse{
+		EchoMsg: req.GetMsg(),
+	}, nil
 }

@@ -22,6 +22,17 @@ message UploadResponse {
   UploadStatus status = 1;
 }
 
+
+message EchoMessage {
+  string msg = 1;
+}
+
+message EchoResponse {
+  string echoMsg = 1;
+}
+
 service FS {
   rpc Upload(stream Chunk) returns (UploadResponse);
+  rpc Download(DownloadRequest) returns (stream Chunk);
+  rpc Echo(EchoMessage) returns (EchoResponse);
 }

@@ -19,7 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	FS_Upload_FullMethodName = "/FS/Upload"
+	FS_Upload_FullMethodName   = "/FS/Upload"
+	FS_Download_FullMethodName = "/FS/Download"
+	FS_Echo_FullMethodName     = "/FS/Echo"
 )
 
 // FSClient is the client API for FS service.
@@ -27,6 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type FSClient interface {
 	Upload(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[Chunk, UploadResponse], error)
+	Download(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Chunk], error)
+	Echo(ctx context.Context, in *EchoMessage, opts ...grpc.CallOption) (*EchoResponse, error)
 }
 
 type fSClient struct {
@@ -50,11 +54,42 @@ func (c *fSClient) Upload(ctx context.Context, opts ...grpc.CallOption) (grpc.Cl
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FS_UploadClient = grpc.ClientStreamingClient[Chunk, UploadResponse]
 
+func (c *fSClient) Download(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Chunk], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &FS_ServiceDesc.Streams[1], FS_Download_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[DownloadRequest, Chunk]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type FS_DownloadClient = grpc.ServerStreamingClient[Chunk]
+
+func (c *fSClient) Echo(ctx context.Context, in *EchoMessage, opts ...grpc.CallOption) (*EchoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EchoResponse)
+	err := c.cc.Invoke(ctx, FS_Echo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FSServer is the server API for FS service.
 // All implementations must embed UnimplementedFSServer
 // for forward compatibility.
 type FSServer interface {
 	Upload(grpc.ClientStreamingServer[Chunk, UploadResponse]) error
+	Download(*DownloadRequest, grpc.ServerStreamingServer[Chunk]) error
+	Echo(context.Context, *EchoMessage) (*EchoResponse, error)
 	mustEmbedUnimplementedFSServer()
 }
 
@@ -67,6 +102,12 @@ type UnimplementedFSServer struct{}
 
 func (UnimplementedFSServer) Upload(grpc.ClientStreamingServer[Chunk, UploadResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Upload not implemented")
+}
+func (UnimplementedFSServer) Download(*DownloadRequest, grpc.ServerStreamingServer[Chunk]) error {
+	return status.Errorf(codes.Unimplemented, "method Download not implemented")
+}
+func (UnimplementedFSServer) Echo(context.Context, *EchoMessage) (*EchoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Echo not implemented")
 }
 func (UnimplementedFSServer) mustEmbedUnimplementedFSServer() {}
 func (UnimplementedFSServer) testEmbeddedByValue()            {}
@@ -96,18 +137,57 @@ func _FS_Upload_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FS_UploadServer = grpc.ClientStreamingServer[Chunk, UploadResponse]
 
+func _FS_Download_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DownloadRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(FSServer).Download(m, &grpc.GenericServerStream[DownloadRequest, Chunk]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type FS_DownloadServer = grpc.ServerStreamingServer[Chunk]
+
+func _FS_Echo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EchoMessage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FSServer).Echo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FS_Echo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FSServer).Echo(ctx, req.(*EchoMessage))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FS_ServiceDesc is the grpc.ServiceDesc for FS service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var FS_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "FS",
 	HandlerType: (*FSServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Echo",
+			Handler:    _FS_Echo_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Upload",
 			Handler:       _FS_Upload_Handler,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "Download",
+			Handler:       _FS_Download_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "pb/fileserver.proto",
