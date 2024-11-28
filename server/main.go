@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"log"
 	"net"
 	"proto/api"
@@ -30,6 +33,16 @@ var logHandler grpc.UnaryServerInterceptor = func(ctx context.Context, req any, 
 	/*	if info.FullMethod != pb.FS_Echo_FullMethodName {
 		return next(ctx, req)
 	}*/
+
+	md, ok := metadata.FromIncomingContext(ctx)
+
+	if !ok {
+		return nil, status.Errorf(codes.FailedPrecondition, "Metadata not found in request")
+	}
+
+	if v := md.Get("api-key"); len(v) == 0 || v[0] != "123456" {
+		return nil, status.Errorf(codes.Unauthenticated, "Wrong api-key")
+	}
 
 	fmt.Printf("Unary Req type: %T - Method: %s\n", req, info.FullMethod)
 	res, err := next(ctx, req)

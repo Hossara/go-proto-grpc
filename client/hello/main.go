@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"log"
 	"proto/pb"
 
@@ -22,11 +24,19 @@ func main() {
 
 	echoClient := pb.NewFSClient(client)
 
-	res, err := echoClient.Echo(context.Background(), &pb.EchoMessage{
+	ctx := metadata.NewOutgoingContext(context.Background(), metadata.Pairs("api-key", "223"))
+
+	res, err := echoClient.Echo(ctx, &pb.EchoMessage{
 		Msg: "Hello",
 	})
 
 	if err != nil {
+		code, ok := status.FromError(err)
+
+		if ok {
+			log.Fatalf("\nError code: %s\nMessage: %s", code.Code(), code.Message())
+		}
+
 		log.Fatal(err)
 	}
 
